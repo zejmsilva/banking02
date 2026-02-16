@@ -1,0 +1,252 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.bank</groupId>
+  <artifactId>banking02</artifactId>
+  <version>1.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
+
+  <name>Banking 02 Project</name>
+  <description>Comparação SBST (EvoSuite) vs LLM (JUnit) com isolamento por profiles</description>
+
+  <properties>
+    <!-- Java -->
+    <java.version>8</java.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+    <!-- Versões -->
+    <junit.jupiter.version>5.10.1</junit.jupiter.version>
+    <jacoco.version>0.8.11</jacoco.version>
+    <pitest.version>1.15.2</pitest.version>
+    <pitest.junit5.plugin.version>1.2.0</pitest.junit5.plugin.version>
+
+    <!-- Padrões default de includes (quando rodar sem profile) -->
+    <surefire.include.1>**/*Test.java</surefire.include.1>
+    <surefire.include.2>**/*Tests.java</surefire.include.2>
+    <surefire.include.3>**/*_ESTest.java</surefire.include.3>
+
+    <!-- Sufixo do relatório JaCoCo (separado por profile) -->
+    <report.suffix>all</report.suffix>
+
+    <!-- PITEST default (pode ser sobrescrito por profile) -->
+    <pit.targetClasses>com.bank.*</pit.targetClasses>
+    <pit.targetTests>com.bank.*</pit.targetTests>
+  </properties>
+
+  <dependencies>
+    <!-- JUnit 5 para a suíte LLM -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <version>${junit.jupiter.version}</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+
+      <!-- Compilar com Java 8 -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.11.0</version>
+        <configuration>
+          <source>${java.version}</source>
+          <target>${java.version}</target>
+          <encoding>${project.build.sourceEncoding}</encoding>
+        </configuration>
+      </plugin>
+
+      <!-- Executar testes -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.2.5</version>
+        <configuration>
+          <useModulePath>false</useModulePath>
+          <argLine>@{argLine}</argLine>
+          <includes>
+            <include>${surefire.include.1}</include>
+            <include>${surefire.include.2}</include>
+            <include>${surefire.include.3}</include>
+          </includes>
+        </configuration>
+      </plugin>
+
+      <!-- JaCoCo -->
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>${jacoco.version}</version>
+        <executions>
+
+          <execution>
+            <id>prepare-agent</id>
+            <goals>
+              <goal>prepare-agent</goal>
+            </goals>
+            <configuration>
+              <destFile>${project.build.directory}/jacoco-${report.suffix}.exec</destFile>
+            </configuration>            
+          </execution>
+
+          <execution>
+            <id>report</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>report</goal>
+            </goals>
+            <configuration>
+              <dataFile>${project.build.directory}/jacoco-${report.suffix}.exec</dataFile>
+              <outputDirectory>${project.reporting.outputDirectory}/jacoco-${report.suffix}</outputDirectory>
+            </configuration>
+          </execution>
+
+        </executions>
+      </plugin>
+
+      <!-- PITEST -->
+      <plugin>
+        <groupId>org.pitest</groupId>
+        <artifactId>pitest-maven</artifactId>
+        <version>${pitest.version}</version>
+
+        <!-- Suporte a JUnit5 no PIT (para LLM) -->
+        <dependencies>
+          <dependency>
+            <groupId>org.pitest</groupId>
+            <artifactId>pitest-junit5-plugin</artifactId>
+            <version>${pitest.junit5.plugin.version}</version>
+          </dependency>
+        </dependencies>
+
+        <configuration>
+          <targetClasses>
+            <param>${pit.targetClasses}</param>
+          </targetClasses>
+
+          <targetTests>
+            <param>${pit.targetTests}</param>
+          </targetTests>
+
+          <outputFormats>
+            <param>HTML</param>
+            <param>XML</param>
+          </outputFormats>
+
+          <threads>4</threads>
+        </configuration>
+      </plugin>
+
+    </plugins>
+  </build>
+
+  <profiles>
+
+    <!-- ========================= -->
+    <!-- Profile LLM -->
+    <!-- ========================= -->
+    <profile>
+      <id>llm</id>
+
+      <properties>
+        <report.suffix>llm</report.suffix>
+
+        <surefire.include.1>com/bank/llm/**/*Test.java</surefire.include.1>
+        <surefire.include.2>com/bank/llm/**/*Tests.java</surefire.include.2>
+        <surefire.include.3>__none__</surefire.include.3>
+
+        <pit.targetClasses>com.bank.*</pit.targetClasses>
+        <pit.targetTests>com.bank.llm.*</pit.targetTests>
+      </properties>
+
+      <!-- CRÍTICO: não compilar testes do EvoSuite no profile LLM -->
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <configuration>
+              <testExcludes>
+                <testExclude>com/bank/evosuite/**</testExclude>
+              </testExcludes>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
+    <!-- ========================= -->
+    <!-- Profile EvoSuite -->
+    <!-- ========================= -->
+    <profile>
+      <id>evosuite</id>
+
+      <!-- Dependências necessárias SÓ para testes gerados pelo EvoSuite 1.0.6 -->
+      <dependencies>
+
+        <!-- JUnit 4 -->
+        <dependency>
+          <groupId>junit</groupId>
+          <artifactId>junit</artifactId>
+          <version>4.13.2</version>
+          <scope>test</scope>
+        </dependency>
+
+        <!-- EvoSuite runtime -->
+        <dependency>
+          <groupId>org.evosuite</groupId>
+          <artifactId>evosuite-standalone-runtime</artifactId>
+          <version>1.0.6</version>
+          <scope>test</scope>
+        </dependency>
+
+        <!-- Para o Surefire/JUnit Platform rodar JUnit4 -->
+        <dependency>
+          <groupId>org.junit.vintage</groupId>
+          <artifactId>junit-vintage-engine</artifactId>
+          <version>${junit.jupiter.version}</version>
+          <scope>test</scope>
+        </dependency>
+
+      </dependencies>
+
+      <properties>
+        <report.suffix>evosuite</report.suffix>
+
+        <surefire.include.1>com/bank/evosuite/**/*_ESTest.java</surefire.include.1>
+        <surefire.include.2>com/bank/evosuite/**/*Test.java</surefire.include.2>
+        <surefire.include.3>__none__</surefire.include.3>
+
+        <pit.targetClasses>com.bank.*</pit.targetClasses>
+        <pit.targetTests>com.bank.evosuite.*</pit.targetTests>
+      </properties>
+
+      <!-- Recomendado: não compilar testes LLM no profile EvoSuite -->
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <configuration>
+              <testExcludes>
+                <testExclude>com/bank/llm/**</testExclude>
+              </testExcludes>
+            </configuration>
+          </plugin>
+
+
+
+        </plugins>
+      </build>
+    </profile>
+
+  </profiles>
+
+</project>
